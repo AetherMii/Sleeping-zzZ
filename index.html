@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>聊天阅读器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  /* 让 hidden 属性强制生效（防止 display:flex 把它覆盖掉） */
+  [hidden] { display: none !important; }
+
+  :root {
+    /* 界面字体（可被右侧字体按钮动态替换） */
+    --ui-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  }
+  body {
+    font-family: var(--ui-font);
+    background: #f2f3f5;
+    color: #1a1a1a;
+  }
+
+  /* ===== 第一屏：选择文件 ===== */
+  #drop {
+    position: fixed; inset: 0; z-index: 5;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 40px 24px; text-align: center;
+    background: linear-gradient(160deg, #f6f8fb 0%, #e6ecf4 100%);
+    border: 3px dashed #b9c4d2; margin: 16px; border-radius: 20px;
+  }
+  #drop.drag { background: #dce9ff; border-color: #4a6cf7; }
+  #drop .icon { font-size: 64px; line-height: 1; }
+  #drop h1 { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  #drop p { color: #6b7686; font-size: 15px; line-height: 1.7; }
+  #drop .btn {
+    margin-top: 6px; padding: 13px 34px; font-size: 16px; font-weight: 600; color: #fff;
+    background: #4a6cf7; border: none; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(74,108,247,.35);
+  }
+  #drop .btn:active { transform: scale(.97); }
+  #drop .hint { font-size: 12px; color: #9aa5b4; }
+
+  /* ===== 第二屏：预览 ===== */
+  #viewer { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; max-width: 780px; margin: 0 auto; }
+
+  header {
+    position: relative;
+    background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e6e9ee; padding: 8px 12px 8px 6px;
+  }
+  header .bar { display: flex; align-items: center; gap: 4px; }
+  #back {
+    flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 6px 8px; margin-right: 0;
+    font-size: 14px; font-weight: 600; color: #4a5568;
+    background: transparent; border: none; border-radius: 10px; cursor: pointer;
+  }
+  #back .back-arrow { font-size: 18px; font-weight: 400; line-height: 1; margin-right: 3px; }
+  #back:hover { background: #f1f3f6; }
+  .title-wrap { flex: 1; min-width: 0; }
+  .title-wrap h2 { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .title-wrap .meta { font-size: 12px; color: #9aa5b4; margin-top: 1px; }
+
+  /* 换字体按钮：横幅右侧的圆点 */
+  #font-btn {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid #e2e6ec; background: #f1f3f6; color: #4a5568;
+    font-size: 14px; font-weight: 700; cursor: pointer; margin-left: 6px;
+  }
+  #font-btn:hover { background: #e8ebf0; }
+
+  /* 字体选择面板 */
+  #font-panel {
+    position: absolute; top: 100%; right: 12px; margin-top: 6px; z-index: 50;
+    width: 240px; background: #fff; border: 1px solid #e6e9ee;
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.14);
+    padding: 10px;
+  }
+  .fp-title { font-size: 12px; color: #9aa5b4; margin: 2px 4px 8px; }
+  #font-list { display: flex; flex-direction: column; gap: 4px; max-height: 230px; overflow-y: auto; }
+  .fp-item {
+    text-align: left; width: 100%; padding: 8px 10px; border: 1px solid transparent;
+    border-radius: 8px; background: #fff; color: #333; font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .fp-item:hover { background: #f4f6fa; }
+  .fp-item.on { background: #eef2ff; border-color: #4a6cf7; }
+  .fp-item .fp-sample { font-size: 12px; color: #9aa5b4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+  .fp-item .fp-check { color: #4a6cf7; font-weight: 700; flex-shrink: 0; }
+  #font-upload {
+    width: 100%; margin-top: 8px; padding: 8px; border-radius: 8px;
+    border: 1px dashed #c6cede; background: #fafbfc; color: #4a6cf7;
+    font-size: 13px; cursor: pointer;
+  }
+  #font-upload:hover { background: #f0f4ff; }
+
+  /* ===== 聊天区 ===== */
+  #chat { flex: 1; overflow-y: auto; padding: 14px 14px 50px; }
+
+  .msg { display: flex; align-items: flex-start; }
+  .msg + .msg { margin-top: 12px; }
+  .msg.grouped { margin-top: 2px; }
+  .msg.right { justify-content: flex-end; }   /* 右对齐消息贴右边缘 */
+
+  .bubble-wrap { display: flex; flex-direction: column; max-width: 76%; min-width: 0; }
+  .msg.right .bubble-wrap { align-items: flex-end; }
+
+  .name { font-size: 12px; color: #8a95a5; margin: 0 4px 4px; }
+  .msg.left .name { text-align: left; }
+  .msg.right .name { text-align: right; }
+  .msg.grouped .name { display: none; }
+
+  .bubble {
+    padding: 10px 14px; border-radius: 16px;
+    font-size: 15px; line-height: 1.7;
+    background: #ffffff;
+    border: 1px solid #d9dde3;               /* 浅灰色系边框 */
+    color: #4b5563;                            /* 深灰色字体 */
+    word-break: break-word; overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .msg.left .bubble  { border-top-left-radius: 4px; }
+  .msg.right .bubble { border-top-right-radius: 4px; }
+  .bubble strong { font-weight: 700; color: #1f2937; }
+  .bubble code {
+    background: #f1f3f6; padding: 1px 6px; border-radius: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px;
+    color: #c0392b;
+  }
+  .bubble a { color: #4a6cf7; text-decoration: underline; word-break: break-all; }
+  .bubble br { display: block; margin: 4px 0; content: ""; }
+
+  .time { font-size: 11px; color: #a6b0bf; margin: 4px 6px 0; }
+  .msg.right .time { text-align: right; }
+
+  #error { text-align: center; color: #d64545; padding: 60px 20px; font-size: 14px; line-height: 1.8; }
+  #error pre { background: #fff; border-radius: 10px; padding: 12px; margin: 12px auto; max-width: 90%;
+    font-size: 12px; text-align: left; overflow: auto; color: #555; }
+</style>
+</head>
+<body>
+
+  <!-- 第一屏：选择文件 -->
+  <div id="drop">
+    <div class="icon">💬</div>
+    <h1>聊天阅读器</h1>
+    <p>把聊天文件拖到这块区域<br>或者点下面的按钮选择文件</p>
+    <button class="btn" type="button">选择聊天文件</button>
+    <input type="file" id="file" accept=".md,.json,.txt,.log" hidden>
+    <p class="hint">支持 macOS / Windows / iPhone（Safari）· 兼容纯文本和 JSON 两种格式</p>
+  </div>
+
+  <!-- 第二屏：纯享预览 -->
+  <div id="viewer" hidden>
+    <header>
+      <div class="bar">
+        <button id="back" type="button"><span class="back-arrow">←</span>返回</button>
+        <div class="title-wrap">
+          <h2 id="title"></h2>
+          <div class="meta" id="meta"></div>
+        </div>
+        <button id="font-btn" type="button" title="更换界面字体">文</button>
+      </div>
+      <div id="font-panel" hidden>
+        <div class="fp-title">界面字体</div>
+        <div id="font-list"></div>
+        <button id="font-upload" type="button">＋ 载入字体文件…</button>
+        <input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2" hidden>
+      </div>
+    </header>
+    <div id="chat"></div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var drop = document.getElementById('drop');
+  var fileInput = document.getElementById('file');
+  var viewer = document.getElementById('viewer');
+  var chat = document.getElementById('chat');
+  var titleEl = document.getElementById('title');
+  var metaEl = document.getElementById('meta');
+  var backBtn = document.getElementById('back');
+
+  var fontBtn = document.getElementById('font-btn');
+  var fontPanel = document.getElementById('font-panel');
+  var fontList = document.getElementById('font-list');
+  var fontUpload = document.getElementById('font-upload');
+  var fontFile = document.getElementById('font-file');
+
+  var PALETTE = ['#e05263', '#2f9e6e', '#4a6cf7', '#e8830c', '#9b59b6', '#0f9fc0', '#d94b6e', '#6c8c2f'];
+  var GAP_DIVIDER_SEC = 300; // 5 分钟内算同一条连续对话
+
+  // 发件人 → 左右边
+  var SENDER_SIDE = { '方景仪': 'right', '沈屿舟': 'left' };
+
+  /* ===== 字体：系统默认 + 本地上传字体文件 ===== */
+  var FONT_STACK_DEFAULT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif';
+  var CUSTOM_FONT_NAME = 'custom-font-saved';
+  var LS_KEY = 'chatViewerFont';
+  var LS_DATA = 'chatViewerFontData';
+  var activeFont = 'default';
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function formatDate(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  function b64FromBuffer(buf) {
+    var bin = '';
+    var bytes = new Uint8Array(buf);
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function b64ToBuffer(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  // 把一份字体字节注册为可用的 @font-face（优先 FontFace API，老浏览器退回 base64 注入）
+  function registerFont(name, arrayBuffer) {
+    if (window.FontFace && document.fonts) {
+      var ff = new FontFace(name, arrayBuffer);
+      return ff.load().then(function (loaded) {
+        document.fonts.add(loaded);
+        return true;
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var b64 = b64FromBuffer(arrayBuffer);
+        var css = "@font-face{font-family:'" + name + "';src:url(data:font/ttf;base64," + b64 + ");}";
+        var st = document.createElement('style');
+        st.textContent = css;
+        document.head.appendChild(st);
+        resolve(true);
+      } catch (e) { reject(e); }
+    });
+  }
+  function registerFontFromB64(name, b64) {
+    try { return registerFont(name, b64ToBuffer(b64)); } catch (e) { return Promise.reject(e); }
+  }
+
+  function setUiFont(family) {
+    document.documentElement.style.setProperty('--ui-font', family);
+  }
+
+  function applyFont(key) {
+    activeFont = key;
+    setUiFont(key === 'custom' ? '"' + CUSTOM_FONT_NAME + '", sans-serif' : FONT_STACK_DEFAULT);
+    localStorage.setItem(LS_KEY, key);
+    renderFontList();
+  }
+
+  function openFontPanel() {
+    renderFontList();
+    fontPanel.hidden = false;
+  }
+  function closeFontPanel() { fontPanel.hidden = true; }
+
+  function renderFontList() {
+    fontList.innerHTML = '';
+    var items = [{ key: 'default', name: '系统默认', family: FONT_STACK_DEFAULT }];
+    if (activeFont === 'custom' || localStorage.getItem(LS_DATA)) {
+      items.push({ key: 'custom', name: '自定义字体', family: '"' + CUSTOM_FONT_NAME + '", sans-serif' });
+    }
+    items.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fp-item' + (activeFont === it.key ? ' on' : '');
+      b.setAttribute('data-key', it.key);
+      b.style.fontFamily = it.family;                       // 让每一项用对应字体预览
+      var label = document.createElement('span');
+      label.textContent = it.name;
+      b.appendChild(label);
+      var sample = document.createElement('span');
+      sample.className = 'fp-sample';
+      sample.textContent = 'Aa 123 预览';
+      b.appendChild(sample);
+      var check = document.createElement('span');
+      check.className = 'fp-check';
+      check.textContent = activeFont === it.key ? '✓' : '';
+      b.appendChild(check);
+      b.addEventListener('click', function () { applyFont(it.key); closeFontPanel(); });
+      fontList.appendChild(b);
+    });
+  }
+
+  // 载入本地字体文件（ttf/otf/woff2），立即应用并尽量记住
+  function loadFontFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var buf = e.target.result;
+      var b64 = '';
+      try { b64 = b64FromBuffer(buf); } catch (err) {}
+      registerFont(CUSTOM_FONT_NAME, buf).then(function () {
+        if (b64) {
+          try { localStorage.setItem(LS_DATA, b64); } catch (err) { /* 字体太大，只在本次会话生效 */ }
+        }
+        applyFont('custom');
+        closeFontPanel();
+      }).catch(function () {
+        alert('字体载入失败，请换一个文件试试。');
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    fontFile.value = '';
+  }
+
+  // 启动时恢复上次选的字体
+  function restoreFont() {
+    var stored = localStorage.getItem(LS_KEY);
+    var data = localStorage.getItem(LS_DATA);
+    if (stored === 'custom' && data) {
+      registerFontFromB64(CUSTOM_FONT_NAME, data).then(function () {
+        applyFont('custom');
+      }).catch(function () { applyFont('default'); });
+      return;
+    }
+    applyFont(stored === 'default' || !stored ? 'default' : stored);
+  }
+
+  fontBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (fontPanel.hidden) openFontPanel(); else closeFontPanel();
+  });
+  document.addEventListener('click', function (e) {
+    if (!fontPanel.hidden && !e.target.closest('#font-panel') && !e.target.closest('#font-btn')) {
+      closeFontPanel();
+    }
+  });
+  fontUpload.addEventListener('click', function () { fontFile.click(); });
+  fontFile.addEventListener('change', function () { loadFontFile(fontFile.files[0]); });
+
+  restoreFont();
+
+  /* ---------- 解析 ---------- */
+
+  function parseChat(text) {
+    text = text.replace(/^﻿/, '').trim();
+
+    // 1) JSON 格式（旧导出）
+    if (text[0] === '[' || text[0] === '{') {
+      try {
+        var data = JSON.parse(text);
+        var arr = Array.isArray(data) ? data : (data.messages || data.chat || data.items || []);
+        if (Array.isArray(arr) && arr.length) {
+          var parsed = arr
+            .filter(function (m) { return m && (m.content !== undefined || m.text !== undefined); })
+            .map(function (m) {
+              return {
+                sender: m.sender || m.author || m.from || '未知',
+                time: m.time || m.timestamp || '',
+                content: m.content || m.text || ''
+              };
+            });
+          if (parsed.length) return { msgs: parsed, format: 'json' };
+        }
+      } catch (e) { /* 不是 JSON，继续走文本解析 */ }
+    }
+
+    // 2) 纯文本格式：[2026-08-13 02:05:23] 方景仪: "内容"
+    var re = /^\[([^\]]+)\]\s*([^:]+):\s?(.*)$/;
+    var msgs = [];
+    var lines = text.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(re);
+      if (!m) continue;
+      var content = m[3].trim();
+      if ((content.charAt(0) === '"' && content.charAt(content.length - 1) === '"') ||
+          (content.charAt(0) === '“' && content.charAt(content.length - 1) === '”')) {
+        content = content.slice(1, -1).trim();
+      }
+      msgs.push({ sender: m[2].trim(), time: m[1].trim(), content: content });
+    }
+    if (msgs.length) return { msgs: msgs, format: 'text' };
+    return { msgs: [], format: 'none' };
+  }
+
+  /* ---------- 渲染 ---------- */
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function formatContent(text) {
+    var t = text.replace(/\r\n/g, '\n');
+    t = escapeHtml(t);
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');   // 加粗
+    t = t.replace(/`([^`]+)`/g, '<code>$1</code>');             // 行内代码
+    t = t.replace(/\n/g, '<br>');                               // 换行
+    t = t.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return t;
+  }
+
+  function toTs(t) {
+    var d = new Date(t.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+  function gapSec(t1, t2) {
+    var a = toTs(t1), b = toTs(t2);
+    if (a === null || b === null) return 0;
+    return Math.abs(b - a) / 1000;
+  }
+  function sameDay(t1, t2) {
+    var a = toTs(t1), b = toTs(t2);
+    if (a === null || b === null) return true;
+    var da = new Date(a), db = new Date(b);
+    return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+  }
+
+  // 完整时间：文本格式直接原样显示；JSON 里的数字时间戳转成 2026-08-08 12:49:25
+  function fullTime(t) {
+    if (!t && t !== 0) return '';
+    if (typeof t === 'number') {
+      var ts = t < 1e12 ? t * 1000 : t;
+      var d = new Date(ts);
+      if (!isNaN(d.getTime())) return formatDate(d);
+    }
+    return String(t);
+  }
+
+  function render(msgs, fileName) {
+    // 发件人信息：颜色、左右边（方景仪右、沈屿舟左，其余按出现顺序交替）
+    var senderInfo = {};
+    var order = [];
+    msgs.forEach(function (m) {
+      if (!senderInfo[m.sender]) {
+        var idx = order.length;
+        order.push(m.sender);
+        senderInfo[m.sender] = {
+          color: PALETTE[idx % PALETTE.length],
+          side: SENDER_SIDE[m.sender] || (idx % 2 === 0 ? 'left' : 'right')
+        };
+      }
+    });
+
+    // 分组：同发件人 + 5 分钟内 → 紧凑（只影响间距，不再显示任何中间分隔条）
+    var groups = [];
+    for (var i = 0; i < msgs.length; i++) {
+      var m = msgs[i], prev = msgs[i - 1];
+      var grouped = prev && prev.sender === m.sender &&
+                    gapSec(prev.time, m.time) < GAP_DIVIDER_SEC && sameDay(prev.time, m.time);
+      groups.push({ msg: m, grouped: grouped });
+    }
+
+    // 横幅：只显示文件名 + 消息条数
+    titleEl.textContent = fileName;
+    metaEl.textContent = msgs.length + ' 条消息';
+
+    // 聊天区
+    chat.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var j = 0; j < groups.length; j++) {
+      var g = groups[j], msg = g.msg, info = senderInfo[msg.sender];
+
+      var row = document.createElement('div');
+      row.className = 'msg ' + info.side + (g.grouped ? ' grouped' : '');
+
+      // 名字 + 气泡 + 完整时间
+      var wrap = document.createElement('div');
+      wrap.className = 'bubble-wrap';
+      var nm = document.createElement('div');
+      nm.className = 'name';
+      nm.textContent = msg.sender;
+      var bb = document.createElement('div');
+      bb.className = 'bubble';
+      bb.innerHTML = formatContent(msg.content);
+      var tm = document.createElement('div');
+      tm.className = 'time';
+      tm.textContent = fullTime(msg.time);
+      wrap.appendChild(nm);
+      wrap.appendChild(bb);
+      wrap.appendChild(tm);
+
+      row.appendChild(wrap);
+
+      frag.appendChild(row);
+    }
+    chat.appendChild(frag);
+    chat.scrollTop = 0;
+  }
+
+  /* ---------- 界面切换 & 文件读取 ---------- */
+
+  function showScreen(which) {
+    drop.hidden = (which === 'viewer');
+    viewer.hidden = (which !== 'viewer');
+    if (which !== 'viewer') closeFontPanel();
+  }
+
+  function loadFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var result = parseChat(e.target.result);
+      if (!result.msgs.length) {
+        chat.innerHTML = '<div id="error">没有在这份文件里找到聊天消息。<br>'
+          + '它应该是类似这样的行：<pre>[2026-08-13 02:05:23] 方景仪: "你好"</pre>'
+          + '如果你拖的是日记/笔记文件，那确实不是聊天记录。</div>';
+        return;
+      }
+      showScreen('viewer');
+      render(result.msgs, file.name);
+    };
+    reader.onerror = function () {
+      chat.innerHTML = '<div id="error">读取文件失败，请重试。</div>';
+      showScreen('viewer');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  // 返回上一屏
+  backBtn.addEventListener('click', function () { showScreen('drop'); });
+
+  // 选择/拖放
+  drop.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function () { loadFile(fileInput.files[0]); fileInput.value = ''; });
+
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('drag'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+
+  // 防止浏览器直接把文件打开（而不是加载进页面）
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) { e.preventDefault(); });
+
+})();
+</script>
+</body>
+</html>
