@@ -9,8 +9,23 @@
   html, body { height: 100%; }
   /* 让 hidden 属性强制生效（防止 display:flex 把它覆盖掉） */
   [hidden] { display: none !important; }
+
+  /* ===== 字体配置 =====
+     · 把字体文件放到和本文件同级的 fonts/ 目录里（比如 fonts/纯白幻想の月幌黑.ttf）
+       上传 GitHub 时把整个文件夹一起传，仓库里的字体就能用。
+     · 想加更多字体：在这里再加一个 @font-face，再在下面 JS 的 FONT_PRESETS 里加一项即可。 */
+  @font-face {
+    font-family: '纯白幻想の月幌黑';
+    src: url('fonts/纯白幻想の月幌黑.ttf') format('truetype');
+    font-display: swap;
+  }
+
+  :root {
+    /* 界面字体（可被右侧字体按钮动态替换） */
+    --ui-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-family: var(--ui-font);
     background: #f2f3f5;
     color: #1a1a1a;
   }
@@ -39,37 +54,60 @@
   #viewer { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; max-width: 780px; margin: 0 auto; }
 
   header {
+    position: relative;
     background: rgba(255,255,255,.96); backdrop-filter: blur(8px);
-    border-bottom: 1px solid #e6e9ee; padding: 8px 12px 8px;
+    border-bottom: 1px solid #e6e9ee; padding: 8px 12px;
   }
   header .bar { display: flex; align-items: center; gap: 6px; }
   #back {
     flex-shrink: 0;
-    display: flex; align-items: center; gap: 2px;
+    display: flex; align-items: center;
     padding: 8px 10px; margin-right: 2px;
-    font-size: 16px; font-weight: 600; color: #4a5568;
+    font-size: 17px; font-weight: 600; color: #4a5568;
     background: transparent; border: none; border-radius: 10px; cursor: pointer;
   }
+  #back .back-arrow { font-size: 22px; font-weight: 400; line-height: 1; margin-right: 4px; }
   #back:hover { background: #f1f3f6; }
   .title-wrap { flex: 1; min-width: 0; }
   .title-wrap h2 { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .title-wrap .meta { font-size: 12px; color: #9aa5b4; margin-top: 1px; }
 
-  #chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .chip {
-    padding: 4px 12px; font-size: 12px; border-radius: 999px; cursor: pointer;
-    background: #f1f3f6; color: #4a5568; border: 1px solid #e2e6ec;
+  /* 换字体按钮：横幅右侧的圆点 */
+  #font-btn {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid #e2e6ec; background: #f1f3f6; color: #4a5568;
+    font-size: 14px; font-weight: 700; cursor: pointer; margin-left: 6px;
   }
-  .chip.on { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+  #font-btn:hover { background: #e8ebf0; }
+
+  /* 字体选择面板 */
+  #font-panel {
+    position: absolute; top: 100%; right: 12px; margin-top: 6px; z-index: 50;
+    width: 240px; background: #fff; border: 1px solid #e6e9ee;
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.14);
+    padding: 10px;
+  }
+  .fp-title { font-size: 12px; color: #9aa5b4; margin: 2px 4px 8px; }
+  #font-list { display: flex; flex-direction: column; gap: 4px; max-height: 230px; overflow-y: auto; }
+  .fp-item {
+    text-align: left; width: 100%; padding: 8px 10px; border: 1px solid transparent;
+    border-radius: 8px; background: #fff; color: #333; font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .fp-item:hover { background: #f4f6fa; }
+  .fp-item.on { background: #eef2ff; border-color: #4a6cf7; }
+  .fp-item .fp-sample { font-size: 12px; color: #9aa5b4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+  .fp-item .fp-check { color: #4a6cf7; font-weight: 700; flex-shrink: 0; }
+  #font-upload {
+    width: 100%; margin-top: 8px; padding: 8px; border-radius: 8px;
+    border: 1px dashed #c6cede; background: #fafbfc; color: #4a6cf7;
+    font-size: 13px; cursor: pointer;
+  }
+  #font-upload:hover { background: #f0f4ff; }
 
   /* ===== 聊天区 ===== */
   #chat { flex: 1; overflow-y: auto; padding: 14px 14px 50px; }
-
-  .divider { text-align: center; margin: 16px 0 14px; }
-  .divider span {
-    font-size: 12px; color: #9aa5b4; background: rgba(0,0,0,.05);
-    padding: 4px 12px; border-radius: 999px; display: inline-block;
-  }
 
   .msg { display: flex; align-items: flex-start; }
   .msg + .msg { margin-top: 12px; }
@@ -128,13 +166,19 @@
   <div id="viewer" hidden>
     <header>
       <div class="bar">
-        <button id="back" type="button">‹ 返回</button>
+        <button id="back" type="button"><span class="back-arrow">←</span>返回</button>
         <div class="title-wrap">
           <h2 id="title"></h2>
           <div class="meta" id="meta"></div>
         </div>
+        <button id="font-btn" type="button" title="更换界面字体">文</button>
       </div>
-      <div id="chips"></div>
+      <div id="font-panel" hidden>
+        <div class="fp-title">界面字体</div>
+        <div id="font-list"></div>
+        <button id="font-upload" type="button">＋ 载入字体文件…</button>
+        <input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2" hidden>
+      </div>
     </header>
     <div id="chat"></div>
   </div>
@@ -149,14 +193,196 @@
   var chat = document.getElementById('chat');
   var titleEl = document.getElementById('title');
   var metaEl = document.getElementById('meta');
-  var chipsEl = document.getElementById('chips');
   var backBtn = document.getElementById('back');
+
+  var fontBtn = document.getElementById('font-btn');
+  var fontPanel = document.getElementById('font-panel');
+  var fontList = document.getElementById('font-list');
+  var fontUpload = document.getElementById('font-upload');
+  var fontFile = document.getElementById('font-file');
 
   var PALETTE = ['#e05263', '#2f9e6e', '#4a6cf7', '#e8830c', '#9b59b6', '#0f9fc0', '#d94b6e', '#6c8c2f'];
   var GAP_DIVIDER_SEC = 300; // 5 分钟内算同一条连续对话
 
   // 发件人 → 左右边
   var SENDER_SIDE = { '方景仪': 'right', '沈屿舟': 'left' };
+
+  /* ===== 字体 =====
+     · FONT_PRESETS 里的 family 要和上面 @font-face 的 font-family 一致。
+     · 想加仓库里的新字体：加 @font-face + 在这里加一项即可。 */
+  var FONT_STACK_DEFAULT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif';
+  var FONT_PRESETS = [
+    { name: '纯白幻想の月幌黑', family: '"纯白幻想の月幌黑", sans-serif' }
+  ];
+  var CUSTOM_FONT_NAME = 'custom-font-saved';
+  var LS_KEY = 'chatViewerFont';
+  var LS_DATA = 'chatViewerFontData';
+  var activeFont = 'default';
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function formatDate(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  function b64FromBuffer(buf) {
+    var bin = '';
+    var bytes = new Uint8Array(buf);
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function b64ToBuffer(b64) {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  // 把一份字体字节注册为可用的 @font-face（优先 FontFace API，老浏览器退回 base64 注入）
+  function registerFont(name, arrayBuffer) {
+    if (window.FontFace && document.fonts) {
+      var ff = new FontFace(name, arrayBuffer);
+      return ff.load().then(function (loaded) {
+        document.fonts.add(loaded);
+        return true;
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var b64 = b64FromBuffer(arrayBuffer);
+        var css = "@font-face{font-family:'" + name + "';src:url(data:font/ttf;base64," + b64 + ");}";
+        var st = document.createElement('style');
+        st.textContent = css;
+        document.head.appendChild(st);
+        resolve(true);
+      } catch (e) { reject(e); }
+    });
+  }
+  function registerFontFromB64(name, b64) {
+    try { return registerFont(name, b64ToBuffer(b64)); } catch (e) { return Promise.reject(e); }
+  }
+
+  function setUiFont(family) {
+    document.documentElement.style.setProperty('--ui-font', family);
+  }
+
+  function applyFont(key) {
+    activeFont = key;
+    if (key === 'default') {
+      setUiFont(FONT_STACK_DEFAULT);
+    } else if (key === 'custom') {
+      setUiFont('"' + CUSTOM_FONT_NAME + '", sans-serif');
+    } else {
+      var preset = null;
+      FONT_PRESETS.forEach(function (p) { if (p.name === key) preset = p; });
+      setUiFont(preset ? preset.family : FONT_STACK_DEFAULT);
+    }
+    localStorage.setItem(LS_KEY, key);
+    renderFontList();
+  }
+
+  function openFontPanel() {
+    renderFontList();
+    checkFontPresets();
+    fontPanel.hidden = false;
+  }
+  function closeFontPanel() { fontPanel.hidden = true; }
+
+  function renderFontList() {
+    fontList.innerHTML = '';
+    var items = [{ key: 'default', name: '系统默认', family: FONT_STACK_DEFAULT }];
+    FONT_PRESETS.forEach(function (p) { items.push({ key: p.name, name: p.name, family: p.family }); });
+    if (activeFont === 'custom' || localStorage.getItem(LS_DATA)) {
+      items.push({ key: 'custom', name: '自定义字体', family: '"' + CUSTOM_FONT_NAME + '", sans-serif' });
+    }
+    items.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fp-item' + (activeFont === it.key ? ' on' : '');
+      b.setAttribute('data-key', it.key);
+      b.style.fontFamily = it.family;                       // 让每一项用对应字体预览
+      var label = document.createElement('span');
+      label.textContent = it.name;
+      b.appendChild(label);
+      var sample = document.createElement('span');
+      sample.className = 'fp-sample';
+      sample.textContent = 'Aa 123 预览';
+      b.appendChild(sample);
+      var check = document.createElement('span');
+      check.className = 'fp-check';
+      check.textContent = activeFont === it.key ? '✓' : '';
+      b.appendChild(check);
+      b.addEventListener('click', function () { applyFont(it.key); closeFontPanel(); });
+      fontList.appendChild(b);
+    });
+  }
+
+  // 提示某个预设字体是否真的能加载到（文件在不在仓库里）
+  function checkFontPresets() {
+    if (!window.FontFace || !document.fonts) return;
+    FONT_PRESETS.forEach(function (p) {
+      try {
+        document.fonts.load('16px ' + p.family).then(function () {
+          var ok = false;
+          try { ok = document.fonts.check('16px ' + p.family); } catch (e) {}
+          var item = fontList.querySelector('.fp-item[data-key="' + p.name + '"] .fp-sample');
+          if (item && !ok) item.textContent = '⚠ 未找到字体文件';
+        }).catch(function () {
+          var item = fontList.querySelector('.fp-item[data-key="' + p.name + '"] .fp-sample');
+          if (item) item.textContent = '⚠ 未找到字体文件';
+        });
+      } catch (e) {}
+    });
+  }
+
+  // 载入本地字体文件（ttf/otf/woff2），立即应用并尽量记住
+  function loadFontFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var buf = e.target.result;
+      var b64 = '';
+      try { b64 = b64FromBuffer(buf); } catch (err) {}
+      registerFont(CUSTOM_FONT_NAME, buf).then(function () {
+        if (b64) {
+          try { localStorage.setItem(LS_DATA, b64); } catch (err) { /* 字体太大，只在本次会话生效 */ }
+        }
+        applyFont('custom');
+        closeFontPanel();
+      }).catch(function () {
+        alert('字体载入失败，请换一个文件试试。');
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    fontFile.value = '';
+  }
+
+  // 启动时恢复上次选的字体
+  function restoreFont() {
+    var stored = localStorage.getItem(LS_KEY);
+    var data = localStorage.getItem(LS_DATA);
+    if (stored === 'custom' && data) {
+      registerFontFromB64(CUSTOM_FONT_NAME, data).then(function () {
+        applyFont('custom');
+      }).catch(function () { applyFont('default'); });
+      return;
+    }
+    applyFont(stored === 'default' || !stored ? 'default' : stored);
+  }
+
+  fontBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (fontPanel.hidden) openFontPanel(); else closeFontPanel();
+  });
+  document.addEventListener('click', function (e) {
+    if (!fontPanel.hidden && !e.target.closest('#font-panel') && !e.target.closest('#font-btn')) {
+      closeFontPanel();
+    }
+  });
+  fontUpload.addEventListener('click', function () { fontFile.click(); });
+  fontFile.addEventListener('change', function () { loadFontFile(fontFile.files[0]); });
+
+  restoreFont();
 
   /* ---------- 解析 ---------- */
 
@@ -233,9 +459,19 @@
     var da = new Date(a), db = new Date(b);
     return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
   }
-  function shortTime(t) { var m = t.match(/(\d{2}):(\d{2})$/); return m ? m[1] + ':' + m[2] : t; }
 
-  function render(msgs, fileName, format) {
+  // 完整时间：文本格式直接原样显示；JSON 里的数字时间戳转成 2026-08-08 12:49:25
+  function fullTime(t) {
+    if (!t && t !== 0) return '';
+    if (typeof t === 'number') {
+      var ts = t < 1e12 ? t * 1000 : t;
+      var d = new Date(ts);
+      if (!isNaN(d.getTime())) return formatDate(d);
+    }
+    return String(t);
+  }
+
+  function render(msgs, fileName) {
     // 发件人信息：颜色、左右边（方景仪右、沈屿舟左，其余按出现顺序交替）
     var senderInfo = {};
     var order = [];
@@ -250,7 +486,7 @@
       }
     });
 
-    // 分组：同发件人 + 5 分钟内 → 紧凑
+    // 分组：同发件人 + 5 分钟内 → 紧凑（只影响间距，不再显示任何中间分隔条）
     var groups = [];
     for (var i = 0; i < msgs.length; i++) {
       var m = msgs[i], prev = msgs[i - 1];
@@ -259,61 +495,31 @@
       groups.push({ msg: m, grouped: grouped });
     }
 
-    var firstT = msgs[0].time, lastT = msgs[msgs.length - 1].time;
+    // 横幅：只显示文件名 + 消息条数
     titleEl.textContent = fileName;
-    metaEl.textContent = msgs.length + ' 条消息 · ' + (format === 'json' ? 'JSON' : '纯文本') + ' 格式';
-    if (firstT && lastT) metaEl.textContent += ' · ' + firstT.slice(0, 10) + ' 至 ' + lastT.slice(0, 10);
-
-    // 发件人筛选 chips
-    chipsEl.innerHTML = '';
-    var allChip = document.createElement('span');
-    allChip.className = 'chip on';
-    allChip.textContent = '全部';
-    allChip.dataset.sender = '';
-    chipsEl.appendChild(allChip);
-    order.forEach(function (s) {
-      var c = document.createElement('span');
-      c.className = 'chip';
-      c.textContent = s;
-      c.dataset.sender = s;
-      chipsEl.appendChild(c);
-    });
+    metaEl.textContent = msgs.length + ' 条消息';
 
     // 聊天区
     chat.innerHTML = '';
     var frag = document.createDocumentFragment();
     for (var j = 0; j < groups.length; j++) {
-      var g = groups[j], m = g.msg, info = senderInfo[m.sender];
-
-      if (j > 0) {
-        var prevG = groups[j - 1];
-        var prevMsg = prevG.msg;
-        var needDiv = !sameDay(prevMsg.time, m.time) || gapSec(prevMsg.time, m.time) >= GAP_DIVIDER_SEC;
-        if (needDiv) {
-          var dv = document.createElement('div');
-          dv.className = 'divider';
-          var sp = document.createElement('span');
-          sp.textContent = m.time;
-          dv.appendChild(sp);
-          frag.appendChild(dv);
-        }
-      }
+      var g = groups[j], msg = g.msg, info = senderInfo[msg.sender];
 
       var row = document.createElement('div');
       row.className = 'msg ' + info.side + (g.grouped ? ' grouped' : '');
 
-      // 名字 + 气泡 + 时间
+      // 名字 + 气泡 + 完整时间
       var wrap = document.createElement('div');
       wrap.className = 'bubble-wrap';
       var nm = document.createElement('div');
       nm.className = 'name';
-      nm.textContent = m.sender;
+      nm.textContent = msg.sender;
       var bb = document.createElement('div');
       bb.className = 'bubble';
-      bb.innerHTML = formatContent(m.content);
+      bb.innerHTML = formatContent(msg.content);
       var tm = document.createElement('div');
       tm.className = 'time';
-      tm.textContent = m.time ? shortTime(m.time) : '';
+      tm.textContent = fullTime(msg.time);
       wrap.appendChild(nm);
       wrap.appendChild(bb);
       wrap.appendChild(tm);
@@ -331,6 +537,7 @@
   function showScreen(which) {
     drop.hidden = (which === 'viewer');
     viewer.hidden = (which !== 'viewer');
+    if (which !== 'viewer') closeFontPanel();
   }
 
   function loadFile(file) {
@@ -345,7 +552,7 @@
         return;
       }
       showScreen('viewer');
-      render(result.msgs, file.name, result.format);
+      render(result.msgs, file.name);
     };
     reader.onerror = function () {
       chat.innerHTML = '<div id="error">读取文件失败，请重试。</div>';
@@ -356,18 +563,6 @@
 
   // 返回上一屏
   backBtn.addEventListener('click', function () { showScreen('drop'); });
-
-  // 筛选
-  chipsEl.addEventListener('click', function (ev) {
-    var chip = ev.target.closest('.chip');
-    if (!chip) return;
-    Array.prototype.forEach.call(chipsEl.querySelectorAll('.chip'), function (c) { c.classList.remove('on'); });
-    chip.classList.add('on');
-    var want = chip.dataset.sender;
-    Array.prototype.forEach.call(chat.querySelectorAll('.msg'), function (r) {
-      r.style.display = (!want || r.querySelector('.name').textContent === want) ? '' : 'none';
-    });
-  });
 
   // 选择/拖放
   drop.addEventListener('click', function () { fileInput.click(); });
