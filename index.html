@@ -10,16 +10,6 @@
   /* 让 hidden 属性强制生效（防止 display:flex 把它覆盖掉） */
   [hidden] { display: none !important; }
 
-  /* ===== 字体配置 =====
-     · 把字体文件放到和本文件同级的 fonts/ 目录里（比如 fonts/纯白幻想の月幌黑.ttf）
-       上传 GitHub 时把整个文件夹一起传，仓库里的字体就能用。
-     · 想加更多字体：在这里再加一个 @font-face，再在下面 JS 的 FONT_PRESETS 里加一项即可。 */
-  @font-face {
-    font-family: '纯白幻想の月幌黑';
-    src: url('fonts/纯白幻想の月幌黑.ttf') format('truetype');
-    font-display: swap;
-  }
-
   :root {
     /* 界面字体（可被右侧字体按钮动态替换） */
     --ui-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
@@ -207,13 +197,8 @@
   // 发件人 → 左右边
   var SENDER_SIDE = { '方景仪': 'right', '沈屿舟': 'left' };
 
-  /* ===== 字体 =====
-     · FONT_PRESETS 里的 family 要和上面 @font-face 的 font-family 一致。
-     · 想加仓库里的新字体：加 @font-face + 在这里加一项即可。 */
+  /* ===== 字体：系统默认 + 本地上传字体文件 ===== */
   var FONT_STACK_DEFAULT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif';
-  var FONT_PRESETS = [
-    { name: '纯白幻想の月幌黑', family: '"纯白幻想の月幌黑", sans-serif' }
-  ];
   var CUSTOM_FONT_NAME = 'custom-font-saved';
   var LS_KEY = 'chatViewerFont';
   var LS_DATA = 'chatViewerFontData';
@@ -268,22 +253,13 @@
 
   function applyFont(key) {
     activeFont = key;
-    if (key === 'default') {
-      setUiFont(FONT_STACK_DEFAULT);
-    } else if (key === 'custom') {
-      setUiFont('"' + CUSTOM_FONT_NAME + '", sans-serif');
-    } else {
-      var preset = null;
-      FONT_PRESETS.forEach(function (p) { if (p.name === key) preset = p; });
-      setUiFont(preset ? preset.family : FONT_STACK_DEFAULT);
-    }
+    setUiFont(key === 'custom' ? '"' + CUSTOM_FONT_NAME + '", sans-serif' : FONT_STACK_DEFAULT);
     localStorage.setItem(LS_KEY, key);
     renderFontList();
   }
 
   function openFontPanel() {
     renderFontList();
-    checkFontPresets();
     fontPanel.hidden = false;
   }
   function closeFontPanel() { fontPanel.hidden = true; }
@@ -291,7 +267,6 @@
   function renderFontList() {
     fontList.innerHTML = '';
     var items = [{ key: 'default', name: '系统默认', family: FONT_STACK_DEFAULT }];
-    FONT_PRESETS.forEach(function (p) { items.push({ key: p.name, name: p.name, family: p.family }); });
     if (activeFont === 'custom' || localStorage.getItem(LS_DATA)) {
       items.push({ key: 'custom', name: '自定义字体', family: '"' + CUSTOM_FONT_NAME + '", sans-serif' });
     }
@@ -314,24 +289,6 @@
       b.appendChild(check);
       b.addEventListener('click', function () { applyFont(it.key); closeFontPanel(); });
       fontList.appendChild(b);
-    });
-  }
-
-  // 提示某个预设字体是否真的能加载到（文件在不在仓库里）
-  function checkFontPresets() {
-    if (!window.FontFace || !document.fonts) return;
-    FONT_PRESETS.forEach(function (p) {
-      try {
-        document.fonts.load('16px ' + p.family).then(function () {
-          var ok = false;
-          try { ok = document.fonts.check('16px ' + p.family); } catch (e) {}
-          var item = fontList.querySelector('.fp-item[data-key="' + p.name + '"] .fp-sample');
-          if (item && !ok) item.textContent = '⚠ 未找到字体文件';
-        }).catch(function () {
-          var item = fontList.querySelector('.fp-item[data-key="' + p.name + '"] .fp-sample');
-          if (item) item.textContent = '⚠ 未找到字体文件';
-        });
-      } catch (e) {}
     });
   }
 
